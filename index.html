@@ -2144,6 +2144,19 @@
           <h1 class="hero-title" id="heroHeadline">
             WHERE THE <span class="highlight-yellow hero-random-word" id="heroRandomWord" title="Changes every time you open the site — click to draw another!">PLAYBOOK</span> MEETS THE MIC.
           </h1>
+          <script>
+            (function() {
+              var words = ["PLAYBOOK", "CHALKBOARD", "FILM ROOM", "GRIDIRON", "HARDWOOD", "PRESS BOX", "LOCKER ROOM", "CLIPBOARD", "HUDDLE", "GAME TAPE", "END ZONE", "SCOUTING REPORT"];
+              var el = document.getElementById("heroRandomWord");
+              if (!el) return;
+              var last = "";
+              try { last = localStorage.getItem("chalked_last_hero_word") || ""; } catch (e) {}
+              var pool = words.filter(function(w) { return w !== last; });
+              var pick = pool[Math.floor(Math.random() * pool.length)] || words[0];
+              el.textContent = pick;
+              try { localStorage.setItem("chalked_last_hero_word", pick); } catch (e) {}
+            })();
+          </script>
           <p class="hero-tagline" id="heroTagline">
             Hosted and produced by Blase Ullrich — skipping the recycled hot takes to break down the games, analytics, matchup previews, and betting angles that actually matter.
           </p>
@@ -2228,7 +2241,7 @@
             <div class="frame-badge-row" style="width:100%; justify-content:space-between; gap:0.4rem;">
               <span class="chalk-badge badge-red">LATEST SHORT ⚡</span>
               <span class="feed-status-pill" id="shortFeedStatus" style="font-size:0.7rem; padding:0.2rem 0.55rem;">🟢 Live Auto-Sync</span>
-              <span style="font-size:0.75rem; color:var(--chalk-yellow); font-weight:700;" id="latestShortDurationBadge">⏱️ 2:41</span>
+              <span style="font-size:0.75rem; color:var(--chalk-yellow); font-weight:700;" id="latestShortDurationBadge">⏱️ 2:24</span>
             </div>
 
             <div class="short-9x16-frame" id="shortVideoFrameContainer">
@@ -2236,10 +2249,10 @@
             </div>
 
             <div class="short-caption">
-              <h3 class="short-title" id="latestShortTitle">Loading Latest Short...</h3>
-              <p class="short-sub" id="latestShortSub">Duration: 2:41 • @ChalkedSportsTalk Shorts</p>
+              <h3 class="short-title" id="latestShortTitle">Met Coach Luke Loucks and well it was something</h3>
+              <p class="short-sub" id="latestShortSub">Nov 4, 2026 • Duration: 2:24 • @ChalkedSportsTalk Shorts</p>
               <div style="display:flex; gap:0.5rem; margin-top:0.75rem; width:100%; flex-wrap:wrap;">
-                <a href="https://www.youtube.com/shorts/_FSYuVtgihU" target="_blank" rel="noopener noreferrer" class="jump-btn jump-primary" id="shortExternalLink" style="flex:1; justify-content:center; min-width:140px;">
+                <a href="https://www.youtube.com/shorts/1QTVT0sTsh8" target="_blank" rel="noopener noreferrer" class="jump-btn jump-primary" id="shortExternalLink" style="flex:1; justify-content:center; min-width:140px;">
                   ⚡ Watch Short
                 </a>
                 <button type="button" class="tool-btn" id="refreshShortBtn" data-sfx-click="tap" title="Check @ChalkedSportsTalk live Shorts feed right now" style="padding:0.45rem 0.7rem;">
@@ -2542,12 +2555,18 @@
         latestVideoDuration: "21:14",
         latestVideoDate: "Oct 24, 2026 • ⏱️ 21:14",
         latestVideoDesc: "Welcome back to Chalked Sports — Episode 66! Packers. Lions. Ford Field. Green Bay has taken the last two meetings, but Detroit is out for blood in the NFC North. Forget the generic media talking points—we put the tape, analytics, and matchup numbers under the microscope.",
-        // Most Recent YouTube Short (9:16 — Auto-Synced from UUSHUAV6wubjOmSGJokq4uKW0w)
-        latestShortId: "_FSYuVtgihU",
-        latestShortTitle: "61 Days of Football: Day 34 | MACtion OT COMEBACK! 🤯 Buffalo Shocks Miami (OH) + Wednesday Night CFB",
-        latestShortDuration: "2:41",
+        // Most Recent YouTube Short (9:16 — Auto-Synced Live via Native-CORS JSON APIs)
+        latestShortId: "1QTVT0sTsh8",
+        latestShortTitle: "Met Coach Luke Loucks and well it was something",
+        latestShortDuration: "2:24",
         latestShortDate: "Nov 4, 2026",
         recentShorts: [
+          {
+            videoId: "1QTVT0sTsh8",
+            title: "Met Coach Luke Loucks and well it was something",
+            duration: "2:24",
+            date: "Nov 4, 2026"
+          },
           {
             videoId: "_FSYuVtgihU",
             title: "61 Days of Football: Day 34 | MACtion OT COMEBACK! 🤯 Buffalo Shocks Miami (OH) + Wednesday Night CFB",
@@ -2574,6 +2593,7 @@
           }
         ],
         knownDurations: {
+          "1QTVT0sTsh8": "2:24",
           "_FSYuVtgihU": "2:41",
           "qtopE_Ah3Cg": "2:42",
           "ndpRnMyOm7Q": "1:04",
@@ -3085,6 +3105,8 @@
 
     /* ==========================================================================
        3. YOUTUBE MEDIA HUB & LIVE CHANNEL FEED LOADER (@ChalkedSportsTalk)
+          Uses Native-CORS JSON APIs (Access-Control-Allow-Origin: *) +
+          YouTube IFrame Player API for 100% Reliable Live Sync on Every Open
        ========================================================================== */
     class YouTubeFeedLoader {
       constructor(config, onFullVideosUpdated = null) {
@@ -3109,8 +3131,22 @@
         this.activeShortId = config.latestShortId;
         this.liveShortsList = Array.isArray(config.recentShorts) ? [...config.recentShorts] : [];
         this.currentShortIndex = 0;
-        this.knownDurations = { ...(config.knownDurations || {}) };
+
+        let cachedDurations = {};
+        try {
+          cachedDurations = JSON.parse(localStorage.getItem("chalked_yt_durations") || "{}");
+        } catch (e) {}
+        this.knownDurations = { ...(config.knownDurations || {}), ...cachedDurations };
+        this.probingIds = new Set();
         this.autoPollTimer = null;
+      }
+
+      saveDurationToCache(videoId, formatted) {
+        if (!videoId || !formatted) return;
+        this.knownDurations[videoId] = formatted;
+        try {
+          localStorage.setItem("chalked_yt_durations", JSON.stringify(this.knownDurations));
+        } catch (e) {}
       }
 
       init() {
@@ -3134,10 +3170,10 @@
 
         this.renderRecentGrid(this.config.recentVideos);
 
-        // 2. Automatically check live YouTube Shorts & Full Video feeds on startup (no user click needed!)
+        // 2. Immediately query live native-CORS YouTube APIs on page open (no user click needed!)
         this.fetchLiveRssFeed(this.config.channelId, true);
 
-        // 3. Start automatic background live-polling (every 90s + on tab focus + on network reconnect)
+        // 3. Start automatic background live-polling (every 60s + on tab focus + on network reconnect)
         this.startAutoLivePolling();
       }
 
@@ -3145,7 +3181,7 @@
         clearInterval(this.autoPollTimer);
         this.autoPollTimer = setInterval(() => {
           this.fetchLiveRssFeed(this.config.channelId, true);
-        }, 90 * 1000);
+        }, 60 * 1000);
 
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible") {
@@ -3162,9 +3198,20 @@
         return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       }
 
+      formatSeconds(totalSec) {
+        const secNum = Math.round(Number(totalSec) || 0);
+        if (secNum <= 0) return "";
+        const hrs = Math.floor(secNum / 3600);
+        const mins = Math.floor((secNum % 3600) / 60);
+        const secs = String(secNum % 60).padStart(2, "0");
+        return hrs > 0
+          ? `${hrs}:${String(mins).padStart(2, "0")}:${secs}`
+          : `${mins}:${secs}`;
+      }
+
       loadMainVideo(videoObj, autoTrigger = false) {
         this.activeVideoId = videoObj.videoId;
-        const dur = this.knownDurations[videoObj.videoId] || videoObj.duration || "21:14";
+        const dur = this.knownDurations[videoObj.videoId] || videoObj.duration || "FULL EP";
         renderBlockProofVideoStage(this.mainContainer, {
           videoId: videoObj.videoId,
           title: videoObj.title,
@@ -3188,9 +3235,13 @@
             card.classList.toggle("active-tape", card.dataset.vid === videoObj.videoId);
           });
         }
+
+        if (!this.knownDurations[videoObj.videoId]) {
+          this.probeLiveVideoDuration(videoObj.videoId, false, videoObj.title, videoObj.date || "");
+        }
       }
 
-      loadShortVideo(shortId, title, duration = "2:41", dateStr = "") {
+      loadShortVideo(shortId, title, duration = "2:24", dateStr = "") {
         this.activeShortId = shortId;
         const resolvedDur = this.knownDurations[shortId] || duration || "SHORT";
 
@@ -3209,54 +3260,136 @@
         }
         if (this.shortExtLink) this.shortExtLink.href = `https://www.youtube.com/shorts/${shortId}`;
 
-        // If this is a brand-new Short whose exact duration isn't cached yet, fetch its exact M:SS length in the background!
+        // If this is a brand-new Short whose exact duration isn't cached yet, probe its exact M:SS length via YouTube IFrame API!
         if (!this.knownDurations[shortId]) {
           this.probeLiveVideoDuration(shortId, true, title, dateStr);
         }
       }
 
-      async probeLiveVideoDuration(videoId, isShort = true, title = "", dateStr = "") {
-        try {
-          const watchUrl = isShort
-            ? `https://www.youtube.com/shorts/${videoId}`
-            : `https://www.youtube.com/watch?v=${videoId}`;
-          const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(watchUrl)}`);
-          if (!res.ok) return;
-          const data = await res.json();
-          const html = data.contents || "";
-          const m = html.match(/"lengthSeconds":"(\d+)"/);
-          if (m && m[1]) {
-            const totalSec = parseInt(m[1], 10);
-            if (totalSec > 0) {
-              const hrs = Math.floor(totalSec / 3600);
-              const mins = Math.floor((totalSec % 3600) / 60);
-              const secs = String(totalSec % 60).padStart(2, "0");
-              const formatted = hrs > 0
-                ? `${hrs}:${String(mins).padStart(2, "0")}:${secs}`
-                : `${mins}:${secs}`;
-              this.knownDurations[videoId] = formatted;
+      ensureYouTubeIframeApi() {
+        if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+        if (window._chalkedYtApiPromise) return window._chalkedYtApiPromise;
 
-              if (isShort && this.activeShortId === videoId) {
-                if (this.shortDurBadge) this.shortDurBadge.textContent = `⏱️ ${formatted}`;
-                if (this.shortSub) {
-                  const datePart = dateStr ? `${dateStr} • ` : "";
-                  this.shortSub.textContent = `${datePart}Duration: ${formatted} • @ChalkedSportsTalk Shorts`;
-                }
-                const cornerEl = this.shortContainer?.querySelector(".stage-duration-corner");
-                if (cornerEl) cornerEl.textContent = `⏱️ ${formatted}`;
+        window._chalkedYtApiPromise = new Promise((resolve) => {
+          const prevCallback = window.onYouTubeIframeAPIReady;
+          window.onYouTubeIframeAPIReady = () => {
+            if (typeof prevCallback === "function") prevCallback();
+            resolve(window.YT);
+          };
+          if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+            const tag = document.createElement("script");
+            tag.src = "https://www.youtube.com/iframe_api";
+            tag.async = true;
+            document.head.appendChild(tag);
+          }
+          setTimeout(() => resolve(window.YT || null), 7000);
+        });
+        return window._chalkedYtApiPromise;
+      }
+
+      applyProbedDurationToDom(videoId, formatted, isShort = true, dateStr = "") {
+        if (!formatted) return;
+        this.saveDurationToCache(videoId, formatted);
+
+        if (isShort && this.activeShortId === videoId) {
+          if (this.shortDurBadge) this.shortDurBadge.textContent = `⏱️ ${formatted}`;
+          if (this.shortSub) {
+            const datePart = dateStr ? `${dateStr} • ` : "";
+            this.shortSub.textContent = `${datePart}Duration: ${formatted} • @ChalkedSportsTalk Shorts`;
+          }
+          const cornerEl = this.shortContainer?.querySelector(".stage-duration-corner");
+          if (cornerEl) cornerEl.textContent = `⏱️ ${formatted}`;
+        } else if (!isShort && this.activeVideoId === videoId) {
+          if (this.mainDate) {
+            this.mainDate.textContent = `${dateStr || "Latest Full Episode"} • ⏱️ ${formatted}`;
+          }
+          const cornerEl = this.mainContainer?.querySelector(".stage-duration-corner");
+          if (cornerEl) cornerEl.textContent = `⏱️ ${formatted}`;
+        }
+      }
+
+      async probeLiveVideoDuration(videoId, isShort = true, title = "", dateStr = "") {
+        if (!videoId || this.knownDurations[videoId] || this.probingIds.has(videoId)) return;
+        this.probingIds.add(videoId);
+
+        // Method 1: Fast native-CORS Piped Streams API check
+        try {
+          const res = await fetch(`https://api.piped.private.coffee/streams/${encodeURIComponent(videoId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Number(data.duration) > 0) {
+              const formatted = this.formatSeconds(data.duration);
+              if (formatted) {
+                this.applyProbedDurationToDom(videoId, formatted, isShort, dateStr);
+                this.probingIds.delete(videoId);
+                return;
               }
             }
           }
-        } catch (e) {
-          // keep fallback duration badge
-        }
+        } catch (e) {}
+
+        // Method 2: Official Browser-Native YouTube IFrame API (works 100% without any CORS proxy!)
+        try {
+          const YT = await this.ensureYouTubeIframeApi();
+          if (YT && YT.Player) {
+            const holder = document.createElement("div");
+            holder.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;";
+            const probeDomId = `yt_dur_probe_${videoId}_${Date.now()}`;
+            const inner = document.createElement("div");
+            inner.id = probeDomId;
+            holder.appendChild(inner);
+            document.body.appendChild(holder);
+
+            let cleanedUp = false;
+            const cleanup = (playerInstance) => {
+              if (cleanedUp) return;
+              cleanedUp = true;
+              try {
+                if (playerInstance && typeof playerInstance.destroy === "function") {
+                  playerInstance.destroy();
+                }
+              } catch (e) {}
+              try {
+                holder.remove();
+              } catch (e) {}
+              this.probingIds.delete(videoId);
+            };
+
+            const player = new YT.Player(probeDomId, {
+              width: "1",
+              height: "1",
+              videoId,
+              playerVars: { autoplay: 0, controls: 0, mute: 1 },
+              events: {
+                onReady: (event) => {
+                  try {
+                    const sec = event.target.getDuration();
+                    const formatted = this.formatSeconds(sec);
+                    if (formatted) {
+                      this.applyProbedDurationToDom(videoId, formatted, isShort, dateStr);
+                    }
+                  } catch (e) {}
+                  cleanup(event.target);
+                },
+                onError: (event) => {
+                  cleanup(event.target);
+                }
+              }
+            });
+
+            setTimeout(() => cleanup(player), 8000);
+            return;
+          }
+        } catch (e) {}
+
+        this.probingIds.delete(videoId);
       }
 
       cycleNextShort() {
         if (!this.liveShortsList || this.liveShortsList.length === 0) return;
         this.currentShortIndex = (this.currentShortIndex + 1) % this.liveShortsList.length;
         const nextShort = this.liveShortsList[this.currentShortIndex];
-        const dur = this.knownDurations[nextShort.videoId] || nextShort.duration || "2:41";
+        const dur = this.knownDurations[nextShort.videoId] || nextShort.duration || "SHORT";
         this.loadShortVideo(nextShort.videoId, nextShort.title, dur, nextShort.date || "");
         if (this.shortStatusEl) {
           this.shortStatusEl.textContent = this.currentShortIndex === 0
@@ -3303,98 +3436,176 @@
         });
       }
 
-      // Multi-gateway CORS-safe YouTube RSS parser (rss2json -> allorigins -> codetabs)
-      async fetchYouTubeFeedEntries(rssFeedUrl) {
-        // 1. Primary: api.rss2json.com (supports Access-Control-Allow-Origin: * even on file://)
+      // Fetch exact title for any YouTube Video ID using NoEmbed (Native Access-Control-Allow-Origin: *)
+      async fetchVideoTitleViaNoembed(videoId) {
         try {
-          const r2jUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssFeedUrl)}`;
-          const res = await fetch(r2jUrl);
+          const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`);
+          if (!res.ok) return "";
+          const data = await res.json();
+          return (data && data.title) ? String(data.title).trim() : "";
+        } catch (e) {
+          return "";
+        }
+      }
+
+      // Live Shorts Sync via Native-CORS JSON APIs (Piped Channel Shorts Tab -> Piped UUSH Playlist -> DecAPI)
+      async fetchLiveShortsFromApi(channelId) {
+        const cleanId = (channelId || this.config.channelId || "UCUAV6wubjOmSGJokq4uKW0w").trim();
+        const shortsPlaylistId = this.config.shortsPlaylistId || ("UUSH" + cleanId.slice(2));
+
+        // 1. Primary Native-CORS Endpoint: Piped Channel Shorts Tab (returns all 48+ live Shorts with IDs & titles)
+        try {
+          const tabPayload = JSON.stringify({
+            originalUrl: `https://www.youtube.com/${cleanId}/shorts`,
+            url: `https://www.youtube.com/${cleanId}/shorts`,
+            id: cleanId,
+            contentFilters: ["shorts"],
+            sortFilter: "",
+            baseUrl: "https://www.youtube.com"
+          });
+          const tabUrl = `https://api.piped.private.coffee/channels/tabs?data=${encodeURIComponent(tabPayload)}`;
+          const res = await fetch(tabUrl);
           if (res.ok) {
             const data = await res.json();
-            if (data && data.status === "ok" && Array.isArray(data.items) && data.items.length > 0) {
-              return data.items.map(item => {
-                const guidParts = String(item.guid || "").split(":");
-                const idFromGuid = guidParts[guidParts.length - 1];
-                const linkMatch = String(item.link || "").match(/(?:v=|\/shorts\/)([A-Za-z0-9_-]{11})/);
-                const videoId = (linkMatch && linkMatch[1]) || idFromGuid;
-                const pubDate = item.pubDate
-                  ? new Date(item.pubDate.replace(" ", "T") + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "Recent";
+            if (data && Array.isArray(data.content) && data.content.length > 0) {
+              const items = data.content.map((item) => {
+                const match = String(item.url || "").match(/(?:v=|\/shorts\/)([A-Za-z0-9_-]{11})/);
+                const videoId = match ? match[1] : "";
+                const knownShort = (this.config.recentShorts || []).find(s => s.videoId === videoId);
+                const durFromApi = Number(item.duration) > 0 ? this.formatSeconds(item.duration) : "";
+                if (videoId && durFromApi) this.saveDurationToCache(videoId, durFromApi);
                 return {
                   videoId,
-                  title: item.title || "",
-                  linkHref: item.link || "",
-                  date: pubDate,
-                  description: item.description || ""
+                  title: item.title || (knownShort ? knownShort.title : "Chalked Sports Short"),
+                  date: knownShort ? knownShort.date : "Latest Short",
+                  duration: this.knownDurations[videoId] || durFromApi || (knownShort ? knownShort.duration : "SHORT")
                 };
               }).filter(x => Boolean(x.videoId));
+
+              if (items.length > 0) return items;
             }
           }
-        } catch (e) {
-          // Fall through to XML proxies
-        }
+        } catch (e) {}
 
-        // 2. Secondary XML gateways (allorigins.win/get & codetabs)
-        const xmlProxies = [
-          `https://api.allorigins.win/get?url=${encodeURIComponent(rssFeedUrl)}`,
-          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssFeedUrl)}`
-        ];
-
-        for (const proxyUrl of xmlProxies) {
-          try {
-            const res = await fetch(proxyUrl);
-            if (!res.ok) continue;
-            let xmlText = "";
-            if (proxyUrl.includes("allorigins.win/get")) {
-              const json = await res.json();
-              xmlText = json.contents || "";
-            } else {
-              xmlText = await res.text();
+        // 2. Fallback Native-CORS Endpoint: Piped Shorts Playlist (UUSH) thumbnail extraction + NoEmbed title
+        try {
+          const res = await fetch(`https://api.piped.private.coffee/playlists/${encodeURIComponent(shortsPlaylistId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const thumbMatch = String(data.thumbnailUrl || "").match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+            if (thumbMatch && thumbMatch[1]) {
+              const newestShortId = thumbMatch[1];
+              const knownShort = (this.config.recentShorts || []).find(s => s.videoId === newestShortId);
+              const title = (knownShort && knownShort.title) || (await this.fetchVideoTitleViaNoembed(newestShortId)) || "Chalked Sports Short";
+              const mergedShorts = [
+                {
+                  videoId: newestShortId,
+                  title,
+                  date: knownShort ? knownShort.date : "Latest Short",
+                  duration: this.knownDurations[newestShortId] || (knownShort ? knownShort.duration : "SHORT")
+                },
+                ...(this.config.recentShorts || []).filter(s => s.videoId !== newestShortId)
+              ];
+              return mergedShorts;
             }
-            if (!xmlText.includes("<entry>")) continue;
-
-            const parser = new DOMParser();
-            const xml = parser.parseFromString(xmlText, "text/xml");
-            const entries = Array.from(xml.querySelectorAll("entry"));
-            if (entries.length > 0) {
-              return entries.map(entry => {
-                const videoId = entry.querySelector("videoId")?.textContent || "";
-                const title = entry.querySelector("title")?.textContent || "";
-                const linkHref = entry.querySelector("link")?.getAttribute("href") || "";
-                const published = entry.querySelector("published")?.textContent;
-                const dateStr = published
-                  ? new Date(published).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "Recent";
-                const desc = entry.querySelector("group > description, description")?.textContent || "";
-                return { videoId, title, linkHref, date: dateStr, description: desc };
-              }).filter(x => Boolean(x.videoId));
-            }
-          } catch (e) {
-            // Try next proxy
           }
-        }
+        } catch (e) {}
+
+        // 3. Fallback Native-CORS Endpoint: DecAPI latest upload check
+        try {
+          const res = await fetch(`https://decapi.me/youtube/latest_video?id=${encodeURIComponent(cleanId)}`);
+          if (res.ok) {
+            const text = (await res.text()).trim();
+            const m = text.match(/^(.*)\s+-\s+https?:\/\/youtu\.be\/([A-Za-z0-9_-]{11})$/);
+            if (m && m[2]) {
+              const vid = m[2];
+              const title = m[1].trim();
+              const isKnownFull = (this.config.recentVideos || []).some(v => v.videoId === vid);
+              if (!isKnownFull) {
+                return [
+                  {
+                    videoId: vid,
+                    title,
+                    date: "Latest Short",
+                    duration: this.knownDurations[vid] || "SHORT"
+                  },
+                  ...(this.config.recentShorts || []).filter(s => s.videoId !== vid)
+                ];
+              }
+            }
+          }
+        } catch (e) {}
 
         return [];
       }
 
+      // Live Full-Length Videos Sync via Native-CORS JSON APIs (Piped UULF Playlist + NoEmbed)
+      async fetchLiveFullVideosFromApi(channelId) {
+        const cleanId = (channelId || this.config.channelId || "UCUAV6wubjOmSGJokq4uKW0w").trim();
+        const fullVideosPlaylistId = this.config.fullVideosPlaylistId || ("UULF" + cleanId.slice(2));
+        let totalFullVideosCount = 77;
+        const discoveredFull = [];
+
+        try {
+          const res = await fetch(`https://api.piped.private.coffee/playlists/${encodeURIComponent(fullVideosPlaylistId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && Number(data.videos) > 0) {
+              totalFullVideosCount = Number(data.videos);
+            }
+            // Extract any relatedStreams if present
+            if (data && Array.isArray(data.relatedStreams) && data.relatedStreams.length > 0) {
+              data.relatedStreams.forEach(item => {
+                const match = String(item.url || "").match(/v=([A-Za-z0-9_-]{11})/);
+                const videoId = match ? match[1] : "";
+                if (!videoId) return;
+                const durFromApi = Number(item.duration) > 0 ? this.formatSeconds(item.duration) : "";
+                if (durFromApi) this.saveDurationToCache(videoId, durFromApi);
+                const known = (this.config.recentVideos || []).find(v => v.videoId === videoId);
+                discoveredFull.push({
+                  videoId,
+                  title: item.title || (known ? known.title : "Chalked Sports Full Episode"),
+                  date: known ? known.date : "Latest Episode",
+                  duration: this.knownDurations[videoId] || durFromApi || (known ? known.duration : "FULL EPISODE"),
+                  category: known ? known.category : "Football",
+                  description: known ? known.description : "Full-length breakdown from @ChalkedSportsTalk."
+                });
+              });
+            }
+
+            // Also check the playlist's lead thumbnailUrl which always contains the #1 newest Full-Length Video ID!
+            const thumbMatch = String(data.thumbnailUrl || "").match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+            if (thumbMatch && thumbMatch[1]) {
+              const newestFullId = thumbMatch[1];
+              if (!discoveredFull.some(v => v.videoId === newestFullId)) {
+                const known = (this.config.recentVideos || []).find(v => v.videoId === newestFullId);
+                const liveTitle = (known && known.title) || (await this.fetchVideoTitleViaNoembed(newestFullId)) || "Chalked Sports Full Episode";
+                discoveredFull.unshift({
+                  videoId: newestFullId,
+                  title: liveTitle,
+                  date: known ? known.date : "Latest Drop",
+                  duration: this.knownDurations[newestFullId] || (known ? known.duration : "FULL EPISODE"),
+                  category: known ? known.category : "Football",
+                  description: known ? known.description : `Full-length episode & breakdown on @ChalkedSportsTalk: ${liveTitle}`
+                });
+              }
+            }
+          }
+        } catch (e) {}
+
+        return { discoveredFull, totalFullVideosCount };
+      }
+
       async refreshLatestShortOnly() {
         const cleanId = (this.config.channelId || "UCUAV6wubjOmSGJokq4uKW0w").trim();
-        const shortsPlaylistId = this.config.shortsPlaylistId || ("UUSH" + cleanId.slice(2));
-        const shortsFeedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${shortsPlaylistId}`;
-
         if (this.shortStatusEl) this.shortStatusEl.textContent = "⏳ Checking Live Shorts...";
-        const shortItems = await this.fetchYouTubeFeedEntries(shortsFeedUrl);
 
+        const shortItems = await this.fetchLiveShortsFromApi(cleanId);
         if (shortItems.length > 0) {
-          this.liveShortsList = shortItems.map(s => ({
-            videoId: s.videoId,
-            title: s.title,
-            date: s.date,
-            duration: this.knownDurations[s.videoId] || "SHORT"
-          }));
+          this.liveShortsList = shortItems;
           this.currentShortIndex = 0;
           const newestShort = this.liveShortsList[0];
-          const dur = this.knownDurations[newestShort.videoId] || (newestShort.videoId === this.config.latestShortId ? this.config.latestShortDuration : "2:41");
+          const dur = this.knownDurations[newestShort.videoId] || newestShort.duration || "SHORT";
           this.loadShortVideo(newestShort.videoId, newestShort.title, dur, newestShort.date);
 
           if (this.shortStatusEl) {
@@ -3413,86 +3624,50 @@
         const cleanId = (channelId || this.config.channelId || "UCUAV6wubjOmSGJokq4uKW0w").trim();
         if (!cleanId) return;
 
-        const shortsPlaylistId = this.config.shortsPlaylistId || ("UUSH" + cleanId.slice(2));
-        const fullVideosPlaylistId = this.config.fullVideosPlaylistId || ("UULF" + cleanId.slice(2));
-
-        const shortsFeedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${shortsPlaylistId}`;
-        const fullVideosFeedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${fullVideosPlaylistId}`;
-        const mainChannelFeedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${cleanId}`;
-
         try {
           if (!isBackgroundAuto) {
             if (this.statusEl) this.statusEl.textContent = "⏳ Syncing Live @ChalkedSportsTalk Feeds...";
             if (this.shortStatusEl) this.shortStatusEl.textContent = "⏳ Syncing Live Shorts...";
           }
 
-          // Fetch dedicated Shorts playlist (UUSH) and dedicated Full-Length Videos playlist (UULF) in parallel!
-          const [shortsEntries, fullEntries] = await Promise.all([
-            this.fetchYouTubeFeedEntries(shortsFeedUrl),
-            this.fetchYouTubeFeedEntries(fullVideosFeedUrl)
+          // Fetch Live Shorts and Live Full-Length Videos in parallel via Native-CORS JSON APIs!
+          const [resolvedShorts, fullResult] = await Promise.all([
+            this.fetchLiveShortsFromApi(cleanId),
+            this.fetchLiveFullVideosFromApi(cleanId)
           ]);
-
-          let resolvedShorts = shortsEntries;
-          let resolvedFull = fullEntries;
-
-          // If both playlist feeds were empty, fall back to the main channel feed and classify each entry
-          if (resolvedShorts.length === 0 && resolvedFull.length === 0) {
-            const combined = await this.fetchYouTubeFeedEntries(mainChannelFeedUrl);
-            combined.forEach(item => {
-              const isShort =
-                item.linkHref.includes("/shorts/") ||
-                /61 Days of Football|^V89 |#shorts|presser|mov$/i.test(item.title);
-              if (isShort) resolvedShorts.push(item);
-              else resolvedFull.push(item);
-            });
-          }
 
           // 1. Update Latest Short (9:16)
           if (resolvedShorts.length > 0) {
-            this.liveShortsList = resolvedShorts.map(s => ({
-              videoId: s.videoId,
-              title: s.title,
-              date: s.date,
-              duration: this.knownDurations[s.videoId] || "2:41"
-            }));
+            this.liveShortsList = resolvedShorts;
             this.currentShortIndex = 0;
             const latestS = this.liveShortsList[0];
-            const dur = this.knownDurations[latestS.videoId] || (latestS.videoId === this.config.latestShortId ? this.config.latestShortDuration : "2:41");
+            const dur = this.knownDurations[latestS.videoId] || latestS.duration || "SHORT";
             this.loadShortVideo(latestS.videoId, latestS.title, dur, latestS.date);
           }
 
-          // 2. Update Latest Full-Length Video (16:9), Recent Film Tape Grid & Podcast Hub
-          if (resolvedFull.length > 0) {
-            const formattedFull = resolvedFull.map(v => {
-              const known = this.config.recentVideos.find(k => k.videoId === v.videoId);
-              return {
-                videoId: v.videoId,
-                title: v.title,
-                date: v.date,
-                duration: this.knownDurations[v.videoId] || (known ? known.duration : "FULL EPISODE"),
-                category: known ? known.category : "Football",
-                description: (v.description && v.description.slice(0, 220)) || (known ? known.description : "Full-length breakdown from @ChalkedSportsTalk.")
-              };
-            });
+          // 2. Update Latest Full-Length Video (16:9), Recent Film Tape Grid, Podcast Hub & Bio Episode Count
+          const resolvedFull = (fullResult && fullResult.discoveredFull) || [];
+          const totalFullVideosCount = (fullResult && fullResult.totalFullVideosCount) || 77;
 
-            const merged = [...formattedFull];
-            this.config.recentVideos.forEach(cfgVid => {
-              if (!merged.some(m => m.videoId === cfgVid.videoId)) {
-                merged.push(cfgVid);
-              }
-            });
+          const merged = [...resolvedFull];
+          (this.config.recentVideos || []).forEach(cfgVid => {
+            if (!merged.some(m => m.videoId === cfgVid.videoId)) {
+              merged.push(cfgVid);
+            }
+          });
 
+          if (merged.length > 0) {
             this.loadMainVideo(merged[0], false);
             this.renderRecentGrid(merged.slice(0, 6));
 
             if (typeof this.onFullVideosUpdated === "function") {
-              this.onFullVideosUpdated(merged);
+              this.onFullVideosUpdated(merged, totalFullVideosCount);
             }
           }
 
           const timeLabel = this.formatTimeNow();
           if (this.statusEl) this.statusEl.textContent = `🟢 Live Auto-Sync • Updated ${timeLabel}`;
-          if (this.shortStatusEl) this.shortStatusEl.textContent = `🟢 Live Short • ${timeLabel}`;
+          if (this.shortStatusEl) this.shortStatusEl.textContent = `🟢 Live Short (${this.liveShortsList.length} Shorts) • ${timeLabel}`;
         } catch (err) {
           if (this.statusEl) this.statusEl.textContent = "🟢 Synced with @ChalkedSportsTalk";
           if (this.shortStatusEl) this.shortStatusEl.textContent = "🟢 Live Auto-Sync";
@@ -5822,29 +5997,51 @@
         }
       }
 
+      loadCachedLiveSlate() {
+        try {
+          const raw = localStorage.getItem(`chalked_live_slate_cache_v2_${this.dateKey}`);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.questions) && parsed.questions.length === 5) {
+            return parsed.questions;
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      saveCachedLiveSlate(questions) {
+        try {
+          localStorage.setItem(`chalked_live_slate_cache_v2_${this.dateKey}`, JSON.stringify({
+            savedAt: Date.now(),
+            questions
+          }));
+        } catch (e) {}
+      }
+
       async init() {
         if (this.dateBadgeEl) {
           this.dateBadgeEl.textContent = `📅 ${this.formatDisplayDate(this.now)} • DAILY 5-FOR-5 SLATE`;
         }
         this.startMidnightCountdown();
 
-        // Render deterministic daily slate immediately so UI is instant, then upgrade with live ESPN scoreboard data
-        this.questions = this.buildFallbackDailySlate();
+        // 1. Render cached live ESPN slate (if available) or date-dynamic fallback immediately, then upgrade with live ESPN API data
+        const cachedLive = this.loadCachedLiveSlate();
+        this.questions = cachedLive || this.buildFallbackDailySlate();
         this.renderQuestions();
 
-        // Automatically fetch live games & Vegas lines on page load without external action
+        // 2. Immediately fetch live games & Vegas lines from ESPN's Native-CORS Scoreboard APIs on page open
         await this.syncLiveDailySlate(true);
 
-        // Start automatic background live polling so scores, status & daily matchups stay live automatically
+        // 3. Start automatic background live polling so scores, status & daily matchups stay live automatically
         this.startAutoLivePolling();
       }
 
       startAutoLivePolling() {
         clearInterval(this.livePollTimer);
-        // Poll live ESPN scoreboards & odds every 2 minutes in the background
+        // Poll live ESPN scoreboards & odds every 60 seconds in the background
         this.livePollTimer = setInterval(() => {
           this.syncLiveDailySlate(true);
-        }, 120000);
+        }, 60000);
 
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "visible") {
@@ -5914,7 +6111,7 @@
         }
       }
 
-      parseEspnEvents(events, sportCode, sportLabel, sportClass, isTodayStrict = true) {
+      parseEspnEvents(events, sportCode, sportLabel, sportClass, tomorrowKey = "") {
         const parsed = [];
         events.forEach(ev => {
           const comp = ev.competitions && ev.competitions[0];
@@ -5930,6 +6127,8 @@
 
           const homeRec = homeComp.records?.[0]?.summary || "";
           const awayRec = awayComp.records?.[0]?.summary || "";
+          const homeScore = homeComp.score || "0";
+          const awayScore = awayComp.score || "0";
 
           const homeRank = (homeComp.curatedRank?.current && homeComp.curatedRank.current <= 25)
             ? `#${homeComp.curatedRank.current} `
@@ -5945,16 +6144,38 @@
           const eventDate = ev.date ? new Date(ev.date) : null;
           const eventLocalKey = eventDate ? this.getLocalDateKey(eventDate) : this.dateKey;
           const isPlayedToday = eventLocalKey === this.dateKey;
+          const isPlayedTomorrow = Boolean(tomorrowKey && eventLocalKey === tomorrowKey);
 
-          const statusDetail = ev.status?.type?.shortDetail || "Scheduled";
+          const state = ev.status?.type?.state || "pre"; // "pre" (upcoming), "in" (live), "post" (final)
+          const rawShortDetail = ev.status?.type?.shortDetail || "Scheduled";
+          let statusDetail = rawShortDetail;
+          if (state === "in") {
+            statusDetail = `🔴 LIVE: ${awayAbbr} ${awayScore}, ${homeAbbr} ${homeScore} (${rawShortDetail})`;
+          } else if (state === "post") {
+            statusDetail = `FINAL: ${awayAbbr} ${awayScore}, ${homeAbbr} ${homeScore}`;
+          }
+
           const broadcast = comp.broadcasts?.[0]?.names?.[0] || "";
 
-          // Score importance: prioritize today's games, ranked teams, tight spreads, and national TV
-          let importance = isPlayedToday ? 100 : 40;
-          if (homeRank) importance += 30;
-          if (awayRank) importance += 30;
-          if (broadcast) importance += 15;
-          if (spreadText) importance += 12;
+          // Prioritize UPCOMING ("pre") & LIVE ("in") games over already-finished ("post") games!
+          // When tonight's games finish ("post"), tomorrow's upcoming games ("pre") automatically rise to the top!
+          let importance = 20;
+          if (state === "pre" && isPlayedToday) {
+            importance = 270;
+          } else if (state === "pre" && isPlayedTomorrow) {
+            importance = 240;
+          } else if (state === "in" && isPlayedToday) {
+            importance = 215;
+          } else if (state === "pre") {
+            importance = 150;
+          } else if (state === "post" && isPlayedToday) {
+            importance = 25;
+          }
+
+          if (homeRank) importance += 25;
+          if (awayRank) importance += 25;
+          if (broadcast) importance += 12;
+          if (spreadText) importance += 15;
 
           parsed.push({
             id: `${sportCode}_${ev.id}`,
@@ -5962,7 +6183,10 @@
             sportLabel,
             sportClass,
             isFootball: sportCode === "NFL" || sportCode === "CFB",
+            state,
+            eventLocalKey,
             isPlayedToday,
+            isPlayedTomorrow,
             importance,
             homeName: `${homeRank}${homeName}`,
             awayName: `${awayRank}${awayName}`,
@@ -6003,13 +6227,13 @@
 
         if (useTotalQuestion && game.overUnder) {
           questionTitle = `${game.awayName} vs. ${game.homeName}: Does the game total finish OVER or UNDER ${game.overUnder} combined ${game.sportCode === "NHL" ? "goals" : "points"}?`;
-          optionA = `🔥 OVER ${game.overUnder} (${game.awayAbbr}/${game.homeAbbr} High-Tempo Shootout)`;
-          optionB = `🛡️ UNDER ${game.overUnder} (Defense & Clock Control Rule)`;
+          optionA = `🔥 OVER ${game.overUnder} (${game.awayAbbr}/${game.homeAbbr} High-Tempo Scoring)`;
+          optionB = `🛡️ UNDER ${game.overUnder} (Defense & Goalie/Clock Control Rule)`;
           angleNote = game.isFootball
             ? `Vegas total is set at ${game.overUnder}${game.spreadText ? ` (${game.spreadText})` : ""}. Red-zone TD efficiency and explosive pass rate will decide whether this clears the number.`
-            : `Total sits at ${game.overUnder}${game.spreadText ? ` (${game.spreadText})` : ""}. Pace-of-play and transition efficiency in the first 10 minutes set the tone here.`;
+            : `Total sits at ${game.overUnder}${game.spreadText ? ` (${game.spreadText})` : ""}. Pace-of-play and early scoring efficiency set the tone here.`;
         } else if (game.spreadText) {
-          // Parse favored team from spreadText e.g. "JAX -10" or "BOS -11.5" or "EMU -1.5"
+          // Parse favored team from spreadText e.g. "JAX -10" or "UTSA -7" or moneyline "UTAH -122"
           const parts = game.spreadText.split(" ");
           const favAbbr = parts[0];
           const lineNum = parts.slice(1).join(" ") || "-2.5";
@@ -6022,12 +6246,19 @@
           const favTeam = isHomeFav ? game.homeName : game.awayName;
           const dogTeam = isHomeFav ? game.awayName : game.homeName;
 
-          questionTitle = `Who covers the chalk line in ${game.awayName} at ${game.homeName} (${game.spreadText})?`;
-          optionA = `⚡ ${favTeam} (${lineNum}) Covers the Spread`;
-          optionB = `🐶 ${dogTeam} (${plusLine}) Covers / Wins Outright`;
-          angleNote = game.isFootball
-            ? `Line: ${game.spreadText}${game.overUnder ? ` • O/U ${game.overUnder}` : ""}. Watch third-down conversion rate and trench pressure rate against the pocket.`
-            : `Line: ${game.spreadText}${game.overUnder ? ` • O/U ${game.overUnder}` : ""}. Half-court shot quality and bench net-rating swings are the key indicators.`;
+          if (numVal >= 100 || game.sportCode === "NHL") {
+            questionTitle = `Who wins this marquee ${game.sportLabel} matchup: ${game.awayName} at ${game.homeName} (${game.spreadText} ML)?`;
+            optionA = `⚡ ${favTeam} (${lineNum} Favorite) Takes the Win`;
+            optionB = `🐶 ${dogTeam} (Underdog) Pulls the Upset`;
+            angleNote = `Line: ${game.spreadText} Moneyline${game.overUnder ? ` • O/U ${game.overUnder}` : ""}. Special teams execution and net-front traffic will decide this one.`;
+          } else {
+            questionTitle = `Who covers the chalk line in ${game.awayName} at ${game.homeName} (${game.spreadText})?`;
+            optionA = `⚡ ${favTeam} (${lineNum}) Covers the Spread`;
+            optionB = `🐶 ${dogTeam} (${plusLine}) Covers / Wins Outright`;
+            angleNote = game.isFootball
+              ? `Line: ${game.spreadText}${game.overUnder ? ` • O/U ${game.overUnder}` : ""}. Watch third-down conversion rate and trench pressure rate against the pocket.`
+              : `Line: ${game.spreadText}${game.overUnder ? ` • O/U ${game.overUnder}` : ""}. Half-court shot quality and bench net-rating swings are the key indicators.`;
+          }
         } else {
           questionTitle = `Who comes out on top in this marquee ${game.sportLabel} showdown: ${game.awayName} at ${game.homeName}?`;
           optionA = `🏆 ${game.awayName} Pulls Off the Road Win`;
@@ -6057,30 +6288,57 @@
 
       async syncLiveDailySlate(silent = false) {
         if (this.feedBadgeEl && !silent) {
-          this.feedBadgeEl.textContent = "⏳ Syncing Today's Live Schedule & Odds...";
+          this.feedBadgeEl.textContent = "⏳ Syncing Live Schedule & Odds...";
         }
 
+        this.now = new Date();
+        this.dateKey = this.getLocalDateKey(this.now);
+        this.yyyymmdd = this.dateKey.replace(/-/g, "");
+
         const d = this.yyyymmdd;
-        const [cfbTodayRaw, cfbWeekRaw, nflWeekRaw, nbaRaw, cbbRaw, nhlRaw] = await Promise.all([
+        const tomorrowObj = new Date(this.now.getTime() + 24 * 60 * 60 * 1000);
+        const tomorrowKey = this.getLocalDateKey(tomorrowObj);
+        const dNext = tomorrowKey.replace(/-/g, "");
+
+        const [
+          cfbTodayRaw,
+          cfbNextRaw,
+          cfbWeekRaw,
+          nflWeekRaw,
+          nbaTodayRaw,
+          nbaNextRaw,
+          cbbTodayRaw,
+          cbbNextRaw,
+          nhlTodayRaw,
+          nhlNextRaw
+        ] = await Promise.all([
           this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${d}`),
+          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=${dNext}`),
           this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard`),
           this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard`),
           this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${d}`),
+          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dNext}`),
           this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${d}`),
-          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=${d}`)
+          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=${dNext}`),
+          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=${d}`),
+          this.fetchEspnEndpoint(`https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=${dNext}`)
         ]);
 
-        // Deduplicate CFB events (today + marquee weekly games)
-        const cfbMap = new Map();
-        [...cfbTodayRaw, ...cfbWeekRaw].forEach(ev => {
-          if (ev && ev.id && !cfbMap.has(ev.id)) cfbMap.set(ev.id, ev);
-        });
+        const dedupEvents = (lists) => {
+          const map = new Map();
+          lists.forEach(arr => {
+            (arr || []).forEach(ev => {
+              if (ev && ev.id && !map.has(ev.id)) map.set(ev.id, ev);
+            });
+          });
+          return Array.from(map.values());
+        };
 
-        const cfbGames = this.parseEspnEvents(Array.from(cfbMap.values()), "CFB", "🏈 COLLEGE FOOTBALL", "sport-football");
-        const nflGames = this.parseEspnEvents(nflWeekRaw, "NFL", "🏈 NFL", "sport-football");
-        const nbaGames = this.parseEspnEvents(nbaRaw, "NBA", "🏀 NBA", "sport-basketball");
-        const cbbGames = this.parseEspnEvents(cbbRaw, "CBB", "🏀 COLLEGE HOOPS", "sport-basketball");
-        const nhlGames = this.parseEspnEvents(nhlRaw, "NHL", "🏒 NHL", "sport-hockey");
+        const cfbGames = this.parseEspnEvents(dedupEvents([cfbTodayRaw, cfbNextRaw, cfbWeekRaw]), "CFB", "🏈 COLLEGE FOOTBALL", "sport-football", tomorrowKey);
+        const nflGames = this.parseEspnEvents(nflWeekRaw, "NFL", "🏈 NFL", "sport-football", tomorrowKey);
+        const nbaGames = this.parseEspnEvents(dedupEvents([nbaTodayRaw, nbaNextRaw]), "NBA", "🏀 NBA", "sport-basketball", tomorrowKey);
+        const cbbGames = this.parseEspnEvents(dedupEvents([cbbTodayRaw, cbbNextRaw]), "CBB", "🏀 COLLEGE HOOPS", "sport-basketball", tomorrowKey);
+        const nhlGames = this.parseEspnEvents(dedupEvents([nhlTodayRaw, nhlNextRaw]), "NHL", "🏒 NHL", "sport-hockey", tomorrowKey);
 
         const totalLiveGames = cfbGames.length + nflGames.length + nbaGames.length + cbbGames.length + nhlGames.length;
         const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -6109,20 +6367,20 @@
           return false;
         };
 
-        // 1. Top College Football Game (today's MACtion/primetime or #1 ranked game)
+        // 1. Top Upcoming/Live College Football Game
         pickNextFrom(cfbGames);
-        // 2. Top NFL Game (TNF/Sunday/MNF marquee game)
+        // 2. Top Upcoming/Live NFL Game
         pickNextFrom(nflGames);
-        // 3. Second Football Game (prioritize any other Football game played today, or next highest CFB/NFL)
+        // 3. Second Football Game (next highest upcoming/live CFB or NFL game)
         const remainingFootball = [...cfbGames, ...nflGames].sort((a, b) => b.importance - a.importance);
         pickNextFrom(remainingFootball);
 
-        // 4. Top NBA or College Basketball Game of the Day
+        // 4. Top Upcoming/Live NBA or College Basketball Game
         if (!pickNextFrom(nbaGames)) {
           pickNextFrom(cbbGames);
         }
 
-        // 5. Top NHL Game of the Day (or College Basketball / second NBA game)
+        // 5. Top Upcoming/Live NHL Game (or College Basketball / second NBA game)
         if (!pickNextFrom(nhlGames)) {
           if (!pickNextFrom(cbbGames)) {
             pickNextFrom(nbaGames);
@@ -6130,13 +6388,14 @@
         }
 
         // Fill any remaining slots up to 5 from all available games sorted by importance
-        const allPools = [...remainingFootball, ...nbaGames, ...cbbGames, ...nhlGames];
+        const allPools = [...remainingFootball, ...nbaGames, ...cbbGames, ...nhlGames].sort((a, b) => b.importance - a.importance);
         while (selectedGames.length < 5 && pickNextFrom(allPools)) {
           // continue until 5
         }
 
         if (selectedGames.length >= 5) {
           this.questions = selectedGames.slice(0, 5).map((g, idx) => this.buildQuestionFromGame(g, idx));
+          this.saveCachedLiveSlate(this.questions);
           this.renderQuestions();
           if (this.feedBadgeEl) {
             this.feedBadgeEl.textContent = `🟢 Live ESPN Schedule & Odds Auto-Synced • ${timeStr}`;
@@ -6145,27 +6404,28 @@
       }
 
       buildFallbackDailySlate() {
-        // Date-seeded rotating fallback pools so 5 fresh Football-first questions automatically rotate every day even offline
+        // Date-seeded rotating fallback pools (used only for the ~200ms before ESPN responds or if offline)
         const dayHash = this.hashSeed(this.dateKey);
+        const displayDay = this.formatDisplayDate(this.now);
         const footballPool = [
           {
-            id: "CFB_EMU_CMU",
+            id: "CFB_UTSA_FAU",
             sportCode: "CFB",
             sportLabel: "🏈 COLLEGE FOOTBALL",
             sportClass: "sport-football",
             isFootball: true,
-            awayName: "Central Michigan",
-            homeName: "Eastern Michigan",
-            awayRaw: "Central Michigan",
-            homeRaw: "Eastern Michigan",
-            awayAbbr: "CMU",
-            homeAbbr: "EMU",
-            awayRec: "Midweek MACtion",
-            homeRec: "Rynearson Stadium",
-            spreadText: "EMU -1.5",
-            overUnder: 44.5,
-            statusDetail: "Tonight • 7:00 PM ET",
-            broadcast: "ESPN2"
+            awayName: "UTSA Roadrunners",
+            homeName: "FAU Owls",
+            awayRaw: "UTSA",
+            homeRaw: "FAU",
+            awayAbbr: "UTSA",
+            homeAbbr: "FAU",
+            awayRec: "AAC Matchup",
+            homeRec: "FAU Stadium",
+            spreadText: "UTSA -7",
+            overUnder: 72.5,
+            statusDetail: `${displayDay} • 7:30 PM ET`,
+            broadcast: "ESPN"
           },
           {
             id: "NFL_JAX_BAL",
@@ -6182,186 +6442,186 @@
             awayRec: "AFC Showdown",
             homeRec: "M&T Bank Stadium",
             spreadText: "JAX -10",
-            overUnder: 40.5,
-            statusDetail: "Primetime • 8:15 PM ET",
+            overUnder: 39.5,
+            statusDetail: `${displayDay} • 8:15 PM ET`,
             broadcast: "Prime Video"
           },
           {
-            id: "CFB_BALL_UMASS",
+            id: "CFB_JMU_USM",
             sportCode: "CFB",
             sportLabel: "🏈 COLLEGE FOOTBALL",
             sportClass: "sport-football",
             isFootball: true,
-            awayName: "Ball State Cardinals",
-            homeName: "UMass Minutemen",
-            awayRaw: "Ball State",
-            homeRaw: "UMass",
-            awayAbbr: "BALL",
-            homeAbbr: "MASS",
-            awayRec: "MAC Clash",
-            homeRec: "McGuirk Stadium",
-            spreadText: "MASS -3.5",
-            overUnder: 49.5,
-            statusDetail: "Tonight • 7:00 PM ET",
-            broadcast: "CBSSN"
+            awayName: "James Madison Dukes",
+            homeName: "Southern Miss Golden Eagles",
+            awayRaw: "James Madison",
+            homeRaw: "Southern Miss",
+            awayAbbr: "JMU",
+            homeAbbr: "USM",
+            awayRec: "Sun Belt Clash",
+            homeRec: "M.M. Roberts Stadium",
+            spreadText: "JMU -14.5",
+            overUnder: 57.5,
+            statusDetail: `${displayDay} • 8:00 PM ET`,
+            broadcast: "ESPN2"
           },
           {
-            id: "CFB_FSU_MIA",
+            id: "CFB_BYU_UTAH",
             sportCode: "CFB",
             sportLabel: "🏈 COLLEGE FOOTBALL",
             sportClass: "sport-football",
             isFootball: true,
-            awayName: "Florida State Seminoles",
-            homeName: "Miami Hurricanes",
-            awayRaw: "Florida State",
-            homeRaw: "Miami",
-            awayAbbr: "FSU",
-            homeAbbr: "MIA",
-            awayRec: "ACC Rivalry",
-            homeRec: "Hard Rock Stadium",
-            spreadText: "MIA -4.5",
-            overUnder: 52.5,
-            statusDetail: "Primetime • 7:30 PM ET",
+            awayName: "#6 BYU Cougars",
+            homeName: "#17 Utah Utes",
+            awayRaw: "BYU",
+            homeRaw: "Utah",
+            awayAbbr: "BYU",
+            homeAbbr: "UTAH",
+            awayRec: "Holy War Rivalry",
+            homeRec: "Rice-Eccles Stadium",
+            spreadText: "UTAH -4.5",
+            overUnder: 48.5,
+            statusDetail: `${displayDay} • 12:00 PM ET`,
             broadcast: "ABC"
           },
           {
-            id: "NFL_KC_BUF",
+            id: "CFB_ALA_LSU",
+            sportCode: "CFB",
+            sportLabel: "🏈 COLLEGE FOOTBALL",
+            sportClass: "sport-football",
+            isFootball: true,
+            awayName: "#4 Alabama Crimson Tide",
+            homeName: "#13 LSU Tigers",
+            awayRaw: "Alabama",
+            homeRaw: "LSU",
+            awayAbbr: "ALA",
+            homeAbbr: "LSU",
+            awayRec: "SEC Showdown",
+            homeRec: "Tiger Stadium",
+            spreadText: "LSU -6",
+            overUnder: 52.5,
+            statusDetail: `${displayDay} • 3:30 PM ET`,
+            broadcast: "ABC"
+          },
+          {
+            id: "NFL_CIN_ATL",
             sportCode: "NFL",
             sportLabel: "🏈 NFL MARQUEE",
             sportClass: "sport-football",
             isFootball: true,
-            awayName: "Kansas City Chiefs",
-            homeName: "Buffalo Bills",
-            awayRaw: "Chiefs",
-            homeRaw: "Bills",
-            awayAbbr: "KC",
-            homeAbbr: "BUF",
-            awayRec: "AFC Heavyweights",
-            homeRec: "Highmark Stadium",
-            spreadText: "BUF -2.5",
-            overUnder: 47.5,
-            statusDetail: "4:25 PM ET",
-            broadcast: "CBS"
-          },
-          {
-            id: "CFB_UGA_TEX",
-            sportCode: "CFB",
-            sportLabel: "🏈 COLLEGE FOOTBALL",
-            sportClass: "sport-football",
-            isFootball: true,
-            awayName: "Georgia Bulldogs",
-            homeName: "Texas Longhorns",
-            awayRaw: "Georgia",
-            homeRaw: "Texas",
-            awayAbbr: "UGA",
-            homeAbbr: "TEX",
-            awayRec: "SEC Top-10 Clash",
-            homeRec: "DKR Memorial",
-            spreadText: "TEX -3.5",
-            overUnder: 55.5,
-            statusDetail: "7:30 PM ET",
-            broadcast: "ABC"
+            awayName: "Cincinnati Bengals",
+            homeName: "Atlanta Falcons",
+            awayRaw: "Bengals",
+            homeRaw: "Falcons",
+            awayAbbr: "CIN",
+            homeAbbr: "ATL",
+            awayRec: "Interconference Clash",
+            homeRec: "Mercedes-Benz Stadium",
+            spreadText: "CIN -3",
+            overUnder: 52.5,
+            statusDetail: `${displayDay} • 1:00 PM ET`,
+            broadcast: "FOX"
           }
         ];
 
         const hoopsPool = [
           {
-            id: "NBA_MIL_BOS",
+            id: "NBA_ORL_PHX",
             sportCode: "NBA",
             sportLabel: "🏀 NBA",
             sportClass: "sport-basketball",
             isFootball: false,
-            awayName: "Milwaukee Bucks",
-            homeName: "Boston Celtics",
-            awayRaw: "Bucks",
-            homeRaw: "Celtics",
-            awayAbbr: "MIL",
-            homeAbbr: "BOS",
-            awayRec: "Eastern Conf.",
-            homeRec: "TD Garden",
-            spreadText: "BOS -11.5",
-            overUnder: 223.5,
-            statusDetail: "Tonight • 7:00 PM ET",
-            broadcast: "ESPN"
+            awayName: "Orlando Magic",
+            homeName: "Phoenix Suns",
+            awayRaw: "Magic",
+            homeRaw: "Suns",
+            awayAbbr: "ORL",
+            homeAbbr: "PHX",
+            awayRec: "Eastern vs. Western",
+            homeRec: "Footprint Center",
+            spreadText: "PHX -4.5",
+            overUnder: 224.5,
+            statusDetail: `${displayDay} • 9:00 PM ET`,
+            broadcast: "NBA League Pass"
           },
           {
-            id: "CBB_DUKE_UNC",
+            id: "NBA_MIA_GSW",
+            sportCode: "NBA",
+            sportLabel: "🏀 NBA",
+            sportClass: "sport-basketball",
+            isFootball: false,
+            awayName: "Miami Heat",
+            homeName: "Golden State Warriors",
+            awayRaw: "Heat",
+            homeRaw: "Warriors",
+            awayAbbr: "MIA",
+            homeAbbr: "GS",
+            awayRec: "Cross-Conference",
+            homeRec: "Chase Center",
+            spreadText: "GS -5.5",
+            overUnder: 226.5,
+            statusDetail: `${displayDay} • 10:00 PM ET`,
+            broadcast: "TNT"
+          },
+          {
+            id: "CBB_WAKE_VAN",
             sportCode: "CBB",
             sportLabel: "🏀 COLLEGE HOOPS",
             sportClass: "sport-basketball",
             isFootball: false,
-            awayName: "Duke Blue Devils",
-            homeName: "North Carolina Tar Heels",
-            awayRaw: "Duke",
-            homeRaw: "North Carolina",
-            awayAbbr: "DUKE",
-            homeAbbr: "UNC",
-            awayRec: "ACC Hoops",
-            homeRec: "Dean Smith Center",
-            spreadText: "UNC -2.5",
-            overUnder: 151.5,
-            statusDetail: "Tonight • 9:00 PM ET",
-            broadcast: "ESPN"
-          },
-          {
-            id: "NBA_LAL_DEN",
-            sportCode: "NBA",
-            sportLabel: "🏀 NBA",
-            sportClass: "sport-basketball",
-            isFootball: false,
-            awayName: "Los Angeles Lakers",
-            homeName: "Denver Nuggets",
-            awayRaw: "Lakers",
-            homeRaw: "Nuggets",
-            awayAbbr: "LAL",
-            homeAbbr: "DEN",
-            awayRec: "Western Conf.",
-            homeRec: "Ball Arena",
-            spreadText: "DEN -5.5",
-            overUnder: 228.5,
-            statusDetail: "Tonight • 10:00 PM ET",
-            broadcast: "TNT"
+            awayName: "Wake Forest Demon Deacons",
+            homeName: "Vanderbilt Commodores",
+            awayRaw: "Wake Forest",
+            homeRaw: "Vanderbilt",
+            awayAbbr: "WAKE",
+            homeAbbr: "VAN",
+            awayRec: "ACC / SEC Hoops",
+            homeRec: "Memorial Gymnasium",
+            spreadText: "VAN -17.5",
+            overUnder: 154.5,
+            statusDetail: `${displayDay} • 6:00 PM ET`,
+            broadcast: "SEC Network"
           }
         ];
 
         const nhlPool = [
           {
-            id: "NHL_SJS_LAK",
+            id: "NHL_UTA_MTL",
             sportCode: "NHL",
             sportLabel: "🏒 NHL",
             sportClass: "sport-hockey",
             isFootball: false,
-            awayName: "San Jose Sharks",
-            homeName: "Los Angeles Kings",
-            awayRaw: "Sharks",
-            homeRaw: "Kings",
-            awayAbbr: "SJ",
-            homeAbbr: "LA",
-            awayRec: "Pacific Div.",
-            homeRec: "Crypto.com Arena",
-            spreadText: "LA -1.5",
+            awayName: "Utah Mammoth",
+            homeName: "Montreal Canadiens",
+            awayRaw: "Mammoth",
+            homeRaw: "Canadiens",
+            awayAbbr: "UTAH",
+            homeAbbr: "MTL",
+            awayRec: "NHL Clash",
+            homeRec: "Bell Centre",
+            spreadText: "UTAH -122",
             overUnder: 6.5,
-            statusDetail: "Tonight • 10:30 PM ET",
+            statusDetail: `${displayDay} • 7:00 PM ET`,
             broadcast: "ESPN+"
           },
           {
-            id: "NHL_TOR_BOS",
+            id: "NHL_VGK_DET",
             sportCode: "NHL",
             sportLabel: "🏒 NHL",
             sportClass: "sport-hockey",
             isFootball: false,
-            awayName: "Toronto Maple Leafs",
-            homeName: "Boston Bruins",
-            awayRaw: "Maple Leafs",
-            homeRaw: "Bruins",
-            awayAbbr: "TOR",
-            homeAbbr: "BOS",
-            awayRec: "Atlantic Div.",
-            homeRec: "TD Garden",
-            spreadText: "BOS -1.5",
-            overUnder: 6.0,
-            statusDetail: "Tonight • 7:30 PM ET",
-            broadcast: "TNT"
+            awayName: "Vegas Golden Knights",
+            homeName: "Detroit Red Wings",
+            awayRaw: "Golden Knights",
+            homeRaw: "Red Wings",
+            awayAbbr: "VGK",
+            homeAbbr: "DET",
+            awayRec: "East vs. West",
+            homeRec: "Little Caesars Arena",
+            spreadText: "VGK -135",
+            overUnder: 6.5,
+            statusDetail: `${displayDay} • 7:00 PM ET`,
+            broadcast: "ESPN+"
           }
         ];
 
@@ -6669,14 +6929,28 @@
         });
       });
 
-      // Helper to scan video titles for the latest episode number (e.g., "Episode 66", "(Ep. 66)") and update the Bio hyperlink live
-      const updateBioLatestEpisodeLink = (extraVideos = []) => {
+      // Helper to scan video titles & live full-video playlist count for the latest episode number and update the Bio hyperlink live
+      const updateBioLatestEpisodeLink = (extraVideos = [], totalFullVideosCount = 77) => {
         const linkEl = document.getElementById("bioLatestEpisodeLink");
         if (!linkEl) return;
 
         let maxEpNum = Number(SITE_CONFIG.bio.latestEpisodeNumber) || 66;
         let bestVideoId = SITE_CONFIG.bio.latestEpisodeVideoId || "WBdPFvaV2Bw";
         let bestTitle = "";
+
+        // If new full-length videos have been added to the channel's UULF playlist (77 full videos = Episode 66 baseline),
+        // automatically increment the episode count even if "(Ep. XX)" wasn't typed in the video title!
+        if (Number(totalFullVideosCount) > 77) {
+          const countBasedEp = 66 + (Number(totalFullVideosCount) - 77);
+          if (countBasedEp > maxEpNum) {
+            maxEpNum = countBasedEp;
+          }
+        }
+
+        if (Array.isArray(extraVideos) && extraVideos.length > 0 && extraVideos[0].videoId) {
+          bestVideoId = extraVideos[0].videoId;
+          bestTitle = extraVideos[0].title || "";
+        }
 
         const allCandidates = [
           ...(Array.isArray(extraVideos) ? extraVideos : []),
@@ -6709,11 +6983,11 @@
       };
 
       // Initialize YouTubeFeedLoader with automatic live callback for Podcast Hub + Bio Latest Episode Number hyperlink
-      const ytLoader = new YouTubeFeedLoader(SITE_CONFIG.youtube, (liveFullVideos) => {
+      const ytLoader = new YouTubeFeedLoader(SITE_CONFIG.youtube, (liveFullVideos, totalFullVideosCount = 77) => {
         if (!Array.isArray(liveFullVideos) || liveFullVideos.length === 0) return;
 
         // Automatically update the bolded episode count hyperlink in the Bio whenever the live feed loads
-        updateBioLatestEpisodeLink(liveFullVideos);
+        updateBioLatestEpisodeLink(liveFullVideos, totalFullVideosCount);
 
         const existingById = new Map(podConfig.featuredAudioEpisodes.map(ep => [ep.videoId, ep]));
         let changed = false;
@@ -6958,48 +7232,61 @@
       };
 
       const syncLiveWritingFeed = async (silent = false) => {
-        if (!writingConfig.rssFeedUrl) return;
         if (writingStatusEl && !silent) {
-          writingStatusEl.textContent = "⏳ Checking V89 Sports RSS for New Articles...";
+          writingStatusEl.textContent = "⏳ Checking V89 Sports API for New Articles...";
         }
         try {
-          const rssUrl = `${writingConfig.rssFeedUrl}&_cb=${Date.now()}`;
-          const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+          // Official WordPress.com Public REST API (Supports Native Access-Control-Allow-Origin: * without any CORS proxy!)
+          const wpRestUrl = `https://public-api.wordpress.com/rest/v1.1/sites/v89sports.wordpress.com/posts/?search=${encodeURIComponent("Blase Ullrich")}&number=10`;
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 6500);
-          const res = await fetch(apiUrl, { signal: controller.signal });
+          const res = await fetch(wpRestUrl, { signal: controller.signal });
           clearTimeout(timer);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          if (data && data.status === "ok" && Array.isArray(data.items)) {
+
+          if (data && Array.isArray(data.posts)) {
             const existingUrls = new Set(writingConfig.articles.map(a => a.url.replace(/\/$/, "")));
             let added = 0;
 
-            data.items.forEach(item => {
-              const cleanLink = (item.link || "").replace(/\/$/, "");
+            data.posts.forEach(post => {
+              const cleanLink = (post.URL || "").replace(/\/$/, "");
               if (!cleanLink || existingUrls.has(cleanLink)) return;
 
-              // Strip HTML tags from description/content
-              const tmp = document.createElement("div");
-              tmp.innerHTML = item.description || item.content || "";
-              const rawText = (tmp.textContent || "").replace(/\s+/g, " ").trim();
-              const pubDate = item.pubDate
-                ? new Date(item.pubDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+              const tmpTitle = document.createElement("div");
+              tmpTitle.innerHTML = post.title || "V89 Sports Feature";
+              const cleanTitle = (tmpTitle.textContent || "V89 Sports Feature").trim();
+
+              const tmpContent = document.createElement("div");
+              tmpContent.innerHTML = post.content || post.excerpt || "";
+              const rawText = (tmpContent.textContent || "").replace(/\s+/g, " ").trim();
+
+              // Verify author byline matches Blase Ullrich
+              const authorName = (post.author && post.author.name) || "";
+              if (!/Blase\s+Ullrich/i.test(rawText) && !/Blase\s+Ullrich/i.test(authorName)) return;
+
+              const pubDate = post.date
+                ? new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
                 : "Recent Article";
 
+              const catNames = post.categories ? Object.keys(post.categories) : [];
+              const paragraphs = Array.from(tmpContent.querySelectorAll("p"))
+                .map(p => (p.textContent || "").trim())
+                .filter(p => p.length > 25 && !/^Written by/i.test(p));
+
               writingConfig.articles.unshift({
-                id: `v89_${Date.now()}_${added}`,
-                title: item.title || "V89 Sports Feature",
-                url: item.link,
+                id: `v89_${post.ID || Date.now()}_${added}`,
+                title: cleanTitle,
+                url: post.URL,
                 outlet: "V89 Sports • WVFS Tallahassee",
-                beat: Array.isArray(item.categories) && item.categories[0]
-                  ? `📰 ${item.categories[0]} • V89 Sports`
+                beat: catNames[0]
+                  ? `📰 ${catNames[0]} • V89 Sports`
                   : "📰 Florida State Sports • Game Coverage",
                 date: pubDate,
                 byline: "Written by Blase Ullrich",
                 stats: [],
-                excerpt: rawText.slice(0, 340) + (rawText.length > 340 ? "…" : ""),
-                bodyParagraphs: []
+                excerpt: (paragraphs[0] || rawText).slice(0, 340) + ((paragraphs[0] || rawText).length > 340 ? "…" : ""),
+                bodyParagraphs: paragraphs.slice(1)
               });
               existingUrls.add(cleanLink);
               added++;
